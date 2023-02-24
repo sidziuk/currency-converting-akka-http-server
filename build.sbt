@@ -4,11 +4,10 @@ ThisBuild / scalaVersion := "2.13.10"
 
 lazy val root = (project in file("."))
   .settings(
-    name := "CurencyConverter"
+    name := "CurrencyConverterService"
   )
 val AkkaVersion = "2.7.0"
 val AkkaHttpVersion = "10.4.0"
-val scalaTestVersion = "3.0.5"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
@@ -16,5 +15,5 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % AkkaHttpVersion,
   "org.typelevel" %% "cats-core" % "2.2.0",
-  "ch.qos.logback"% "logback-classic" % "1.2.11",
+  "ch.qos.logback"% "logback-classic" % "1.2.11"
 )

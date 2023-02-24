@@ -1,8 +1,9 @@
 package httpserver.conversion.messages
 
-import httpserver.CurrencyConverterService.{CashedCurrencyConversionRate, CurrencyRateMessageResponse, ErrorMessage}
+import httpserver.CurrencyConverterService.{CurrencyRateMessageResponse, ErrorMessage}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.math.BigDecimal.RoundingMode
 
 trait CurrencyRateMessageV2Trait {
@@ -46,14 +47,14 @@ final case class CurrencyRateMessageV2(
 
   override def getLocalDate: LocalDate = date.atZone(ZoneOffset.UTC).toLocalDate
 
-  override def getResponseAndCash(
-                                   getCurrencyRate: (String, LocalDate) => (Either[ErrorMessage, BigDecimal], CashedCurrencyConversionRate)
-                                 ): (CurrencyRateMessageResponse, CashedCurrencyConversionRate) = {
+  override def getResponse(
+                            getCurrencyRate: (String, LocalDate) => Future[Either[ErrorMessage, BigDecimal]]
+                          )(implicit ec: ExecutionContext): Future[CurrencyRateMessageResponse] = {
     val convertingCurrencyName = this.currency
     val convertingCurrencyAmount = this.stake
     val localDate = this.getLocalDate
-    val (currencyRate, newCashedCurrencyConversionRate) = getCurrencyRate(convertingCurrencyName, localDate)
-    val response: CurrencyRateMessageResponse = currencyRate match {
+    val currencyRate = getCurrencyRate(convertingCurrencyName, localDate)
+    val response: Future[CurrencyRateMessageResponse] = currencyRate.map {
       case Left(e) => CurrencyRateMessageResponse(Left(e))
       case Right(newCurrencyRate) => CurrencyRateMessageResponse(
         Right(
@@ -64,7 +65,7 @@ final case class CurrencyRateMessageV2(
         )
       )
     }
-    (response, newCashedCurrencyConversionRate)
+    response
   }
 }
 

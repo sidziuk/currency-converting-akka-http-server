@@ -1,13 +1,11 @@
 package httpserver
 
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, ActorSystem, DispatcherSelector}
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
-
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Failure
-import scala.util.Success
+import scala.util.{Failure, Success}
 object CurrencyConverterStarter {
   private def startHttpServer(routes: Route)(implicit system: ActorSystem[_]): Unit = {
     import system.executionContext
@@ -28,29 +26,23 @@ object CurrencyConverterStarter {
 
       implicit val system: ActorSystem[Nothing] = context.system
 
-      val responseAwaitingTimeFromSourceAmount =
-        system.settings.config.getLong("CurrencyConverterServiceConfig.responseAwaitingTimeFromSourceAmount")
-      val responseAwaitingTimeFromSourceUnit =
-        system.settings.config.getString("CurrencyConverterServiceConfig.responseAwaitingTimeFromSourceUnit")
-      val appKey = system.settings.config.getString("CurrencyConverterServiceConfig.appKey")
       val cashAwaitingTimeAmount =
         system.settings.config.getLong("CurrencyConverterServiceConfig.cashAwaitingTimeAmount")
       val cashAwaitingTimeUnit =
         system.settings.config.getString("CurrencyConverterServiceConfig.cashAwaitingTimeUnit")
-
-      val responseAwaitingTimeFromSource = FiniteDuration(responseAwaitingTimeFromSourceAmount, responseAwaitingTimeFromSourceUnit)
       val cashAwaitingTime = FiniteDuration(cashAwaitingTimeAmount, cashAwaitingTimeUnit)
 
-      val currencyConverterService = context.spawn(
-        CurrencyConverterService(responseAwaitingTimeFromSource, appKey, cashAwaitingTime), "CurrencyConverterService")
-      context.watch(currencyConverterService)
+//      implicit val executionContext: ExecutionContext =
+//        context.system.dispatchers.lookup(DispatcherSelector.fromConfig("workin-dispatcher"))
 
-      val routes = new Routes(currencyConverterService)
+      val cashService: ActorRef[CashService.Command] = context.spawn(CashService(cashAwaitingTime), "CashService", DispatcherSelector.fromConfig("working-dispatcher"))
+      context.watch(cashService)
+
+      val routes = new Routes(cashService)
       startHttpServer(routes.baseConversionRote)
 
       Behaviors.empty
     }
     ActorSystem[Nothing](rootBehavior, "CurrencyConvertingHttpServer")
-
   }
 }

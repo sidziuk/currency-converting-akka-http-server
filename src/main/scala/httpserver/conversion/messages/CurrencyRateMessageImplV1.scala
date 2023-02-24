@@ -1,8 +1,9 @@
 package httpserver.conversion.messages
 
-import httpserver.CurrencyConverterService.{CashedCurrencyConversionRate, CurrencyRateMessageResponse, ErrorMessage}
+import httpserver.CurrencyConverterService.{CurrencyRateMessageResponse, ErrorMessage}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.math.BigDecimal.RoundingMode
 
 trait CurrencyRateMessageV1Trait {
@@ -48,7 +49,7 @@ final case class CurrencyRateMessageV1(
                                         override val date: Instant
                                       ) extends CurrencyRateMessageV1Trait with CurrencyRateMessage {
 
-  def toCurrencyRateMessageDTO: CurrencyRateMessageV1DTO = CurrencyRateMessageV1DTO(
+  override def toCurrencyRateMessageDTO: CurrencyRateMessageV1DTO = CurrencyRateMessageV1DTO(
     marketId = marketId,
     selectionId = selectionId,
     odds = odds,
@@ -59,14 +60,14 @@ final case class CurrencyRateMessageV1(
 
   override def getLocalDate: LocalDate = date.atZone(ZoneOffset.UTC).toLocalDate
 
-  override def getResponseAndCash(
-                                   getCurrencyRate: (String, LocalDate) => (Either[ErrorMessage, BigDecimal], CashedCurrencyConversionRate)
-                                 ): (CurrencyRateMessageResponse, CashedCurrencyConversionRate) = {
+  override def getResponse(
+                            getCurrencyRate: (String, LocalDate) => Future[Either[ErrorMessage, BigDecimal]]
+                          )(implicit ec: ExecutionContext): Future[CurrencyRateMessageResponse] = {
     val convertingCurrencyName = this.currency
     val convertingCurrencyAmount = this.stake
     val localDate = this.getLocalDate
-    val (currencyRate, newCashedCurrencyConversionRate) = getCurrencyRate(convertingCurrencyName, localDate)
-    val response: CurrencyRateMessageResponse = currencyRate match {
+    val currencyRate = getCurrencyRate(convertingCurrencyName, localDate)
+    val response: Future[CurrencyRateMessageResponse] = currencyRate.map{
       case Left(e) => CurrencyRateMessageResponse(Left(e))
       case Right(newCurrencyRate) => CurrencyRateMessageResponse(
         Right(
@@ -77,7 +78,7 @@ final case class CurrencyRateMessageV1(
         )
       )
     }
-    (response, newCashedCurrencyConversionRate)
+    response
   }
 }
 
